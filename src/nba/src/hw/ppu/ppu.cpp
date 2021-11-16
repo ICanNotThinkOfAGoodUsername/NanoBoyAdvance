@@ -104,9 +104,11 @@ void PPU::OnScanlineComplete(int cycles_late) {
 
   mmio.dispstat.hblank_flag = 1;
 
-  if (mmio.dispstat.hblank_irq_enable) {
-    irq.Raise(IRQ::Source::HBlank);
-  }
+  scheduler.Add(4, [this](int late) {
+    if (mmio.dispstat.hblank_irq_enable) {
+      irq.Raise(IRQ::Source::HBlank);
+    }
+  });
 
   dma.Request(DMA::Occasion::HBlank);
   
@@ -218,9 +220,11 @@ void PPU::OnVblankScanlineComplete(int cycles_late) {
     dma.StopVideoXferDMA();
   }
 
-  if (dispstat.hblank_irq_enable) {
-    irq.Raise(IRQ::Source::HBlank);
-  }
+  scheduler.Add(4, [this](int late) {
+    if (mmio.dispstat.hblank_irq_enable) {
+      irq.Raise(IRQ::Source::HBlank);
+    }
+  });
 
   if (mmio.vcount >= 225) {
     /* TODO: it appears that this should really happen ~36 cycles into H-draw.
