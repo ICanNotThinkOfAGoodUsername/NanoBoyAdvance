@@ -66,28 +66,18 @@ auto Core::CreateRTC() -> std::unique_ptr<GPIO> {
 }
 
 void Core::Run(int cycles) {
-  using HaltControl = Bus::Hardware::HaltControl;
-
   auto limit = scheduler.GetTimestampNow() + cycles;
 
   while (scheduler.GetTimestampNow() < limit) {
-    if (bus.hw.haltcnt == HaltControl::Halt && irq.HasServableIRQ()) {
-      bus.hw.haltcnt = HaltControl::Run;
+    if (cpu.state.r15 == hle_audio_hook) {
+      // TODO: cache the SoundInfo pointer once we have it?
+      apu.GetMP2K().SoundMainRAM(
+        *bus.GetHostAddress<MP2K::SoundInfo>(
+          *bus.GetHostAddress<u32>(0x0300'7FF0)
+        )
+      );
     }
-
-    if (bus.hw.haltcnt == HaltControl::Run) {
-      if (cpu.state.r15 == hle_audio_hook) {
-        // TODO: cache the SoundInfo pointer once we have it?
-        apu.GetMP2K().SoundMainRAM(
-          *bus.GetHostAddress<MP2K::SoundInfo>(
-            *bus.GetHostAddress<u32>(0x0300'7FF0)
-          )
-        );
-      }
-      cpu.Run();
-    } else {
-      bus.Step(scheduler.GetRemainingCycleCount());
-    }
+    cpu.Run();
   }
 }
 

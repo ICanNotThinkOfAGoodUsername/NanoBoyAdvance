@@ -72,13 +72,30 @@ void Bus::StopPrefetch() {
 }
 
 void Bus::Step(int cycles) {
+  using HaltControl = Hardware::HaltControl;
+
   dma.openbus = false;
 
-  if (hw.dma.IsRunning() && !dma.active) {
-    dma.active = true;
-    hw.dma.Run();
-    dma.active = false;
-    dma.openbus = true;
+  if (!dma.active) {
+    // TODO: the emulator thread might get stuck here forever.
+    do {
+      if (hw.dma.IsRunning()) {
+        dma.active = true;
+        hw.dma.Run();
+        dma.active = false;
+        dma.openbus = true;
+      }
+
+      if (hw.haltcnt == HaltControl::Halt) {
+        if (hw.irq.HasServableIRQ()) {
+          hw.haltcnt = HaltControl::Run;
+          break;
+        }
+
+        // TODO: this (likely) will overshoot sometimes.
+        scheduler.AddCycles(scheduler.GetRemainingCycleCount());
+      }
+    } while (hw.haltcnt == HaltControl::Halt);
   }
 
   scheduler.AddCycles(cycles);
